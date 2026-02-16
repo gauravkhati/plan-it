@@ -32,3 +32,4 @@ frontend-react/.env.development.local
 frontend-react/.env.test.local
 frontend-react/.env.production.local
 frontend-react/coverage/
+frontends
