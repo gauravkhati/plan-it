@@ -195,8 +195,8 @@ export default function PlanPanel({
 
           {/* footer */}
           <div className="pp-footer">
-            <span className="pp-meta">Turn {turnCount} · {sessionId?.slice(0, 8)}…</span>
-            <button className="btn btn-ghost" onClick={onNewSession}>New Session</button>
+            {/* <span className="pp-meta">Turn {turnCount} · {sessionId?.slice(0, 8)}…</span> */}
+            {/* <button className="btn btn-ghost" onClick={onNewSession}>New Session</button> */}
           </div>
         </div>
       </div>

@@ -54,10 +54,6 @@ export default function SessionSidebar({ user, activeSessionId, onSelectSession,
             <FileText size={14} />
             <div className="sidebar-item-info">
               <span className="sidebar-item-name">{s.plan_name || 'Untitled Plan'}</span>
-              <span className="sidebar-item-meta">
-                {s.turn_count} turn{s.turn_count !== 1 ? 's' : ''}
-                {s.has_plan ? ' · Has plan' : ''}
-              </span>
             </div>
           </button>
         ))}
