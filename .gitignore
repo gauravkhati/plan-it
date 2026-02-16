@@ -1,0 +1,34 @@
+# General
+.DS_Store
+*.log
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv/
+venv/
+env/
+*.egg-info/
+.coverage
+htmlcov/
+dist/
+build/
+.pytest_cache/
+
+# Node / React
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+frontend-react/dist/
+frontend-react/.env
+frontend-react/.env.local
+frontend-react/.env.development.local
+frontend-react/.env.test.local
+frontend-react/.env.production.local
+frontend-react/coverage/
