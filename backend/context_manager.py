@@ -14,7 +14,7 @@ from backend.models import Message, MessageRole, Plan, Session
 # Simulated token limit (8 000 tokens).  We approximate 1 token ≈ 4 chars.
 TOKEN_LIMIT = 8_000
 CHARS_PER_TOKEN = 4
-CHAR_LIMIT = TOKEN_LIMIT * CHARS_PER_TOKEN  # 32 000 chars
+CHAR_LIMIT = TOKEN_LIMIT * CHARS_PER_TOKEN  # close to 32 000 chars
 
 # When we hit 75 % of the limit we compress.
 COMPRESSION_THRESHOLD = int(CHAR_LIMIT * 0.75)
@@ -68,7 +68,6 @@ def extract_preferences(text: str, existing: dict) -> dict:
     return updated
 
 
-# ── Compression ─────────────────────────────────────────────────────
 
 async def compress_history(
     messages: list[Message],
@@ -109,8 +108,6 @@ Keep the summary under 600 words.
     ])
     return response.content
 
-
-# ── Public helpers ──────────────────────────────────────────────────
 
 def build_context_messages(session: Session) -> list[dict]:
     """Build the message list to send to the LLM, respecting the token budget.

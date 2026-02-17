@@ -107,12 +107,22 @@ function VersionModal({ version, onClose }) {
 function Versions({ versions }) {
   const [show, setShow] = useState(false);
   const [selected, setSelected] = useState(null);
-  if (!versions?.length) return null;
+  
+  // If no versions, don't render anything
+  if (!versions || versions.length === 0) return null;
 
   return (
     <>
       <div className="pp-section">
-        <button className="pp-section-toggle" onClick={() => setShow(!show)}>
+        <button 
+          className="pp-section-toggle" 
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setShow(!show);
+          }}
+          type="button"
+        >
           <History size={14} />
           Version History ({versions.length})
           {show ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
