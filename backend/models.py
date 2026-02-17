@@ -9,7 +9,6 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-# ── Plan domain models ──────────────────────────────────────────────
 
 class StepStatus(str, Enum):
     PENDING = "pending"
@@ -30,7 +29,6 @@ class Plan(BaseModel):
     steps: list[PlanStep]
 
 
-# ── Agent action enum ───────────────────────────────────────────────
 
 class ActionType(str, Enum):
     NONE = "NONE"
@@ -39,7 +37,7 @@ class ActionType(str, Enum):
     UPDATE = "UPDATE"
 
 
-# ── Structured agent response ──────────────────────────────────────
+# ── Structured agent response ───
 
 class AgentResponse(BaseModel):
     thought: str = Field(..., description="Internal reasoning about the user's request and state.")
@@ -69,7 +67,7 @@ class AgentResponse(BaseModel):
     )
 
 
-# ── Conversation models ────────────────────────────────────────────
+# ── Conversation models ────
 
 class MessageRole(str, Enum):
     USER = "user"
@@ -81,9 +79,10 @@ class Message(BaseModel):
     role: MessageRole
     content: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+    is_blocked: bool = False
 
 
-# ── Plan version tracking ──────────────────────────────────────────
+# ── Plan version tracking ───
 
 class PlanVersion(BaseModel):
     version: int
@@ -92,7 +91,7 @@ class PlanVersion(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-# ── Session state ──────────────────────────────────────────────────
+# ── Session state ────
 
 class Session(BaseModel):
     session_id: str
@@ -108,10 +107,12 @@ class Session(BaseModel):
     user_preferences: dict = Field(default_factory=dict)
     compressed_context: Optional[str] = None
     conversation_summary: Optional[str] = None
+    plan_summary: Optional[str] = None
+    change_summary: Optional[str] = None
     turn_count: int = 0
 
 
-# ── API request / response models ──────────────────────────────────
+# ── API request / response models ────
 
 class ChatRequest(BaseModel):
     session_id: str

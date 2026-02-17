@@ -80,37 +80,61 @@ function PlanBlock({ plan, updatedStepIds }) {
   );
 }
 
+/* ── Version Popup ────────────────────────────────────────────────── */
+function VersionModal({ version, onClose }) {
+  if (!version) return null;
+  return (
+    <div className="pp-modal-backdrop" onClick={onClose}>
+      <div className="pp-modal" onClick={e => e.stopPropagation()}>
+        <div className="pp-modal-header">
+          <div className="pp-modal-title">
+            <span className="pp-ver-badge">v{version.version}</span>
+            {version.change_summary}
+          </div>
+          <button className="pp-modal-close" onClick={onClose}>
+            <XCircle size={18} />
+          </button>
+        </div>
+        <div className="pp-modal-body">
+          <PlanBlock plan={version.plan} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Version history (collapsed by default) ───────────────────────── */
 function Versions({ versions }) {
   const [show, setShow] = useState(false);
-  const [open, setOpen] = useState(null);
+  const [selected, setSelected] = useState(null);
   if (!versions?.length) return null;
 
   return (
-    <div className="pp-section">
-      <button className="pp-section-toggle" onClick={() => setShow(!show)}>
-        <History size={14} />
-        Version History ({versions.length})
-        {show ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-      </button>
+    <>
+      <div className="pp-section">
+        <button className="pp-section-toggle" onClick={() => setShow(!show)}>
+          <History size={14} />
+          Version History ({versions.length})
+          {show ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        </button>
 
-      {show && (
-        <ul className="pp-versions">
-          {[...versions].reverse().map(v => (
-            <li key={v.version} className="pp-ver-item">
-              <button className="pp-ver-row" onClick={() => setOpen(open === v.version ? null : v.version)}>
-                <span className="pp-ver-badge">v{v.version}</span>
-                <span className="pp-ver-text">{v.change_summary}</span>
-                {open === v.version ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-              </button>
-              {open === v.version && (
-                <div className="pp-ver-detail"><PlanBlock plan={v.plan} /></div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+        {show && (
+          <ul className="pp-versions">
+            {[...versions].reverse().map(v => (
+              <li key={v.version} className="pp-ver-item">
+                <button className="pp-ver-row" onClick={() => setSelected(v)}>
+                  <span className="pp-ver-badge">v{v.version}</span>
+                  <span className="pp-ver-text">{v.change_summary}</span>
+                  <ArrowRightCircle size={13} style={{ opacity: 0.5 }} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {selected && <VersionModal version={selected} onClose={() => setSelected(null)} />}
+    </>
   );
 }
 

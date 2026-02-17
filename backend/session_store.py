@@ -16,7 +16,6 @@ from backend.models import Session
 logger = logging.getLogger(__name__)
 
 
-# ── Abstract interface ─────────────────────────────────────────────
 
 class SessionStore(ABC):
     """Base class for session storage backends."""
@@ -42,8 +41,6 @@ class SessionStore(ABC):
         """Return lightweight session summaries for a user."""
         ...
 
-
-# ── In-memory store ────────────────────────────────────────────────
 
 class InMemorySessionStore(SessionStore):
     """Simple dict-backed store. Data is lost on restart."""
@@ -75,8 +72,6 @@ class InMemorySessionStore(SessionStore):
                 })
         return results
 
-
-# ── MongoDB store ──────────────────────────────────────────────────
 
 class MongoSessionStore(SessionStore):
     """Async MongoDB-backed store using Motor."""
@@ -130,7 +125,6 @@ class MongoSessionStore(SessionStore):
         self._client.close()
 
 
-# ── Factory ────────────────────────────────────────────────────────
 
 def create_session_store() -> SessionStore:
     """Create the appropriate store based on environment config.

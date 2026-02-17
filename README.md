@@ -1,114 +1,117 @@
-# Plan-It 📋
+# Plan-It: Intelligent Planning Assistant
 
-**Plan-It** is a sophisticated conversational planning agent that helps users organize thoughts, create structured plans, and refine them through natural dialogue.
+Plan-It is an AI-powered conversational agent designed to help users create, refine, and manage structured plans. Unlike generic chatbots that often lose context or hallucinate structure, Plan-It uses a deterministic state machine to guide users through a specific workflow: clarifying goals, proposing a structure, and refining tasks iteratively.
 
-Built with a **FastAPI** backend powering a **LangGraph** agent (using **Gemini 2.0 Flash**), and a modern, premium **React** frontend.
+This project demonstrates a production-grade implementation of an agentic workflow using **LangChain**, **LangGraph**, **FastAPI**, and **React**.
 
-## ✨ Features
+---
 
-- **Conversational Intelligence** — Powered by Gemini 2.0 and LangGraph for context-aware, multi-turn planning.
-- **Structured Planning** —  Automatically generates organized plans with steps, status tracking, and descriptions.
-- **Smart Context Management** — Handles long conversations with intelligent context compression and token management.
-- **Secure Authentication** — Complete email/password authentication system with JWT sessions.
-- **Persistent Storage** — Saves all plans, versions, and chat history using MongoDB (or in-memory for testing).
-- **Premium UI/UX** — A polished "Vibrant Pro" React interface with:
-  - Real-time chat with optimistic updates
-  - Split-view dashboard (Chat + Plan)
-  - Plan version history
-  - Responsive design with smooth animations
-  - Modern "Vibrant Pro" theme (Electric Indigo/Violet)
+## 🏗️ Architecture & Design Decisions
 
-## 🏗️ Project Structure
+Building a reliable planning agent requires more than just prompting an LLM. This project implements several specific architectural patterns to ensure reliability, safety, and usability.
 
-```
-Plan-It/
-├── backend/
-│   ├── agent.py           # LangGraph agent definition & logic
-│   ├── auth.py            # JWT auth, user management, password hashing
-│   ├── context_manager.py # Token counting & context compression
-│   ├── models.py          # Pydantic data models
-│   ├── server.py          # FastAPI application & endpoints
-│   └── session_store.py   # MongoDB & In-Memory storage backends
-├── frontend-react/        # Modern React Frontend
-│   ├── src/
-│   │   ├── components/    # React components (ChatPanel, PlanPanel, etc.)
-│   │   ├── services/      # API client
-│   │   ├── App.jsx        # Main application logic
-│   │   └── index.css      # Premium "Vibrant Pro" styling
-│   └── vite.config.js     # Vite configuration
-├── requirements.txt       # Python dependencies
-└── README.md
-```
+### 1. The Two-Phase "Commit" Protocol
+One of the biggest challenges with LLM agents is preventing them from finalizing decisions prematurely. To solve this, the agent in `backend/agent.py` implements specific `ActionType` states:
+*   **PROPOSE:** The agent gathers requirements and presents a draft plan. This is a read-only preview state.
+*   **CREATE:** This action is *only* triggered after the user explicitly confirms the proposed plan (e.g., "Yes, looks good").
+*   This separation ensures the user is always in the loop before any persistent state change occurs, preventing the "runaway agent" problem.
 
-## 🚀 Quick Start
+### 2. Structured State Management (LangGraph)
+Instead of treating the conversation as a simple append-only list of strings, the system uses **LangGraph** to model the interaction as a state machine.
+*   The agent's output is not just text; it's a structured `AgentResponse` JSON object containing a `thought` trace (hidden from user), a `response_to_user`, and a strongly-typed `Plan` object.
+*   This allows the Frontend to render interactive UI components (like the Kanban implementation in `PlanPanel.jsx`) rather than just parsing markdown text.
 
-### Backend Setup
+### 3. Context Budgeting & Semantic Compression
+LLM context windows are finite and expensive. The `ContextManager` (`backend/context_manager.py`) actively manages the token budget:
+*   **Token Estimation:** We approximate token counts for every message using a heuristic (1 token ≈ 4 chars).
+*   **Smart Compression:** When the conversation history exceeds 75% of the limit (approx. 6k tokens), a specialized summarization prompt kicks in.
+*   **Key Insight:** Crucially, the *current active plan* is never summarized. It is always injected fresh into the context (`_format_plan_for_context`), ensuring the AI never "forgets" the specific details of the document it's working on, even if the conversation history is compressed.
 
-1. **Install Python dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+### 4. Safety Guardrails vs. System Prompts
+To keep the agent focused, we separated the logic into two distinct layers:
+*   **Guardrail Layer:** A specific `GUARDRAIL_PROMPT` screens inputs *before* they reach the planning logic. This cheaply filters out irrelevant queries (e.g., "Write a poem about dogs") without wasting the main agent's reasoning capacity.
+*   **System Layer:** The core `SYSTEM_PROMPT` focuses purely on the mechanics of plan creation (ID generation, status tracking, summarization), keeping the main prompt cleaner and more effective.
 
-2. **Environment Configuration**
-   Copy `.env.example` to `.env` and configure your keys:
-   ```bash
-   cp .env.example .env
-   ```
-   *Required:* `GOOGLE_API_KEY` (Get from AI Studio)
-   *Optional:* `MONGODB_URI` (Defaults to in-memory storage if omitted)
+---
 
-3. **Start the Server**
-   ```bash
-   uvicorn backend.server:app --reload --port 8000
-   ```
+## 🚀 Setup & Run Instructions
 
-### Frontend Setup
+### Prerequisites
+*   **Python:** 3.10 or higher
+*   **Node.js:** 16+ and npm
+*   **API Keys:** A Google Cloud API Key (for Gemini models)
+*   **Database (Optional):** MongoDB (the app falls back to in-memory storage if not provided)
 
-1. **Navigate to frontend directory**
-   ```bash
-   cd frontend-react
-   ```
+### 1. Backend Setup
 
-2. **Install Node dependencies**
-   ```bash
-   npm install
-   ```
+1.  Navigate to the project root.
+2.  **Create your environment file:**
+    Create a `.env` file in the root directory:
+    ```bash
+    GOOGLE_API_KEY="your_actual_api_key_here"
+    # Optional: MONGODB_URI="mongodb://localhost:27017"
+    # Optional: JWT_SECRET="your_secret_key"
+    ```
 
-3. **Start the Development Server**
-   ```bash
-   npm run dev
-   ```
-   Open [http://localhost:5173](http://localhost:5173) to start planning!
+3.  **Install dependencies:**
+    It is recommended to use a virtual environment:
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # on Windows: venv\Scripts\activate
+    pip install -r requirements.txt
+    ```
 
-## 🔌 API Endpoints
+4.  **Start the API Server:**
+    ```bash
+    uvicorn backend.server:app --reload
+    ```
+    The backend will start at `http://127.0.0.1:8000`.
 
-| Method | Path | Description | Access |
-|--------|------|-------------|--------|
-| **Auth** | | | |
-| `POST` | `/auth/register` | Register new user | Public |
-| `POST` | `/auth/login` | Login & get JWT | Public |
-| `GET` | `/auth/me` | Get current user info | Auth |
-| **Sessions** | | | |
-| `GET` | `/sessions` | List all user plans | Auth |
-| `POST` | `/session` | Create new plan/session | Auth |
-| `GET` | `/session/{id}` | Get plan details | Auth |
-| **Chat** | | | |
-| `POST` | `/chat` | Send message to agent | Auth |
-| `GET` | `/session/{id}/history` | Get chat history | Auth |
-| `GET` | `/session/{id}/versions` | Get plan version history | Auth |
+### 2. Frontend Setup
 
-## 🛠️ Tech Stack
+1.  **Navigate to the frontend directory:**
+    Open a new terminal window.
+    ```bash
+    cd frontend
+    ```
 
-- **AI/LLM:** Google Gemini 2.0 Flash, LangChain, LangGraph
-- **Backend:** Python 3.10, FastAPI, Pydantic, PyJWT, Bcrypt
-- **Database:** MongoDB (Motor async driver)
-- **Frontend:** React 19, Vite, Lucide React
-- **Styling:** Custom CSS Variables system ("Vibrant Pro" theme)
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
 
-## How It Works
+3.  **Start the Development Server:**
+    ```bash
+    npm run dev
+    ```
+    The application will be available at `http://localhost:5173`.
 
-1. **Preprocess** — the user message is added to the session; preferences are extracted and context is compressed if needed.
-2. **Generate** — the full conversation (or compressed summary + recent messages) is sent to Gemini with a structured-output system prompt. The LLM returns a JSON object with `thought`, `response_to_user`, `action`, `plan`, and `change_summary`.
-3. **Postprocess** — the agent's response is recorded, and if a plan was created or updated, a new version is saved.
+### 3. Usage Guide
 
-These three steps run as nodes in a **LangGraph** state graph.
+1.  Open the web interface.
+2.  (Optional) Click "Login" -> "Continue as Guest" for a quick start.
+3.  **Start Planning:** Type a goal like *"Plan a 3-day marketing sprint"*.
+4.  **Refine:** The agent will ask clarifying questions. Answer them to narrow down the scope.
+5.  **Confirm:** Once the agent proposes a plan, review it in the right-hand panel. Type *"Yes"* to finalize it.
+6.  **Execute:** You can now ask the agent to add steps, mark items as complete, or pivots goals.
+
+---
+
+## 🔮 Future Roadmap
+
+### 1. Advanced Tool Calling
+Currently, the agent is purely conversational and structural. The next phase involves equipping the agent with **executable tools** to perform real-world actions. This would allow the agent to not just *plan* a task, but *execute* parts of it (e.g., "Draft an email to the team" or "Search for optimization libraries").
+
+### 2. Model Context Protocol (MCP) Integration
+To extend the agent's capabilities without bloating the core codebase, we plan to integrate **MCP (Model Context Protocol)** servers. This effectively gives the agent a plugin system to interact with external services:
+*   **Calendar Integration:** Automatically block time for planned tasks (Google Calendar/Outlook).
+*   **Travel & Logistics:** Check flight availability and book tickets for travel-related plans.
+*   **Knowledge Retrieval:** Fetch documentation or internal wiki pages to support technical planning tasks.
+
+---
+
+## Technical Stack
+*   **Backend:** FastAPI, Pydantic, Python 3.10+
+*   **AI Orchestration:** LangChain, LangGraph, Google Gemini Pro 2.5
+*   **Frontend:** React 19, Vite, Tailwind CSS (via class names)
+*   **Storage:** MongoDB (Async Motor driver) / In-Memory Fallback

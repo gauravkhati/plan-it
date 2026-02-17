@@ -1,13 +1,13 @@
-"""LangGraph-based planning agent with Gemini structured output."""
 
 from __future__ import annotations
 
 import json
 import os
-from typing import TypedDict, Optional
+from typing import TypedDict, Optional, Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
+from pydantic import BaseModel, Field
 from langgraph.graph import END
 from langgraph.graph.state import StateGraph
 
@@ -28,7 +28,6 @@ from backend.context_manager import (
 )
 
 
-# ── Graph state ────────────────────────────────────────────────────
 
 class AgentState(TypedDict):
     session: Session
@@ -37,17 +36,35 @@ class AgentState(TypedDict):
     error: Optional[str]
 
 
-# ── LLM setup ──────────────────────────────────────────────────────
 
 def _get_llm() -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-pro",
         google_api_key=os.getenv("GOOGLE_API_KEY"),
         temperature=0.7,
     )
 
 
-# ── System prompt ──────────────────────────────────────────────────
+
+GUARDRAIL_PROMPT = """\
+You are a security and relevance guardrail for "Plan-It", a planning assistant.
+Your job is to screen user inputs.
+
+**Allowed topics:**
+- Creating, managing, breaking down plans/tasks/projects/goals.
+- Productivity, scheduling, asking clarifying questions about tasks.
+- Greetings and simple polite conversation.
+
+**Disallowed topics:**
+- General knowledge questions unrelated to a qualified plan (e.g. "Who is the president?", "Explain quantum physics").
+- Creative writing not related to plans (e.g. "Write a poem about dogs").
+- Code generation requests that are not part of a planning step context (e.g. "Write a python script to ping a server").
+- Harmful, illegal, or unethical content.
+- Roleplaying characters other than a planning assistant.
+
+If the input is Allowed, set `is_safe` to true.
+If the input is Disallowed, set `is_safe` to false and provide a polite `refusal_message` explaining that you only help with planning and task management.
+"""
 
 SYSTEM_PROMPT = """\
 You are **Plan-It**, a conversational planning assistant.
@@ -55,7 +72,7 @@ You are **Plan-It**, a conversational planning assistant.
 Your job is to help users create, refine, and manage structured plans through natural dialogue.
 
 ## Plan creation flow (IMPORTANT — two-step confirmation)
-1. **Ask clarifying questions** when the user's request is ambiguous or missing critical details. Don't jump to proposing a plan until you understand the goal.
+1. **Ask clarifying questions** when the user's request is ambiguous or missing critical details. Limit yourself to **one or two questions at a time** to avoid overwhelming the user. Don't jump to proposing a plan until you understand the goal.
 2. When you have enough information to draft a plan, **propose it** (action = PROPOSE). Include the full plan, a plan_summary, and a change_summary. In `response_to_user`, present the summary and ask the user to confirm: e.g. "Here's what I've put together — shall I go ahead and finalize this plan?"
 3. **NEVER use action = CREATE directly** unless the user has explicitly approved a previously proposed plan. When the user confirms (e.g. "yes", "looks good", "go ahead", "approved"), use action = CREATE with the same plan (or the refined version if they requested tweaks).
 4. If the user rejects or wants changes to a proposed plan, incorporate their feedback and PROPOSE again.
@@ -78,7 +95,45 @@ Your job is to help users create, refine, and manage structured plans through na
 """
 
 
-# ── Node functions ─────────────────────────────────────────────────
+
+class GuardrailDecision(BaseModel):
+    is_safe: bool = Field(description="Whether the user input is allowed/relevant.")
+    refusal_message: Optional[str] = Field(description="Message to user if unsafe.")
+
+
+async def guardrails_node(state: AgentState) -> AgentState:
+    """Check if the user input is relevant/safe."""
+    user_input = state["user_input"]
+    llm = _get_llm()
+
+    messages = [
+        SystemMessage(content=GUARDRAIL_PROMPT),
+        HumanMessage(content=user_input),
+    ]
+
+    try:
+        structured_llm = llm.with_structured_output(GuardrailDecision)
+        decision: GuardrailDecision = await structured_llm.ainvoke(messages)
+
+        if not decision.is_safe:
+            # Mark the last message (user input) as blocked
+            state["session"].messages[-1].is_blocked = True
+            
+            # Create a blocked response
+            blocked_resp = AgentResponse(
+                thought="Guardrail blocked irrelevant/unsafe input.",
+                response_to_user=decision.refusal_message or "I can only assist with planning tasks.",
+                action=ActionType.NONE,
+                conversation_summary=state["session"].conversation_summary,  # preserve existing
+            )
+            return {**state, "agent_response": blocked_resp, "error": None}
+
+    except Exception as e:
+        # On error (e.g. overload), just proceed to generate — fail open or log
+        pass
+
+    return {**state, "agent_response": None}
+
 
 async def preprocess_node(state: AgentState) -> AgentState:
     """Add the user message to session, extract preferences, and compress if needed."""
@@ -140,7 +195,8 @@ async def generate_node(state: AgentState) -> AgentState:
             lc_messages.append(SystemMessage(content=content))
 
     try:
-        # Use structured output so Gemini returns a validated Pydantic object directly
+        # Use structured output so Gemini returns a validated Pydantic object directly.
+        #todo: tool calling for more complex actions   
         structured_llm = llm.with_structured_output(AgentResponse)
         agent_resp: AgentResponse = await structured_llm.ainvoke(lc_messages)
         return {**state, "agent_response": agent_resp, "error": None}
@@ -199,27 +255,44 @@ async def postprocess_node(state: AgentState) -> AgentState:
     if agent_resp.conversation_summary:
         session.conversation_summary = agent_resp.conversation_summary
 
+    if agent_resp.plan_summary:
+        session.plan_summary = agent_resp.plan_summary
+
+    if agent_resp.change_summary:
+        session.change_summary = agent_resp.change_summary
+
     return {**state, "session": session}
 
 
-# ── Build the graph ────────────────────────────────────────────────
+def route_guardrails(state: AgentState) -> Literal["generate", "postprocess"]:
+    """If guardrails set a response, skip generation."""
+    if state.get("agent_response"):
+        return "postprocess"
+    return "generate"
+
 
 def build_agent_graph() -> StateGraph:
     graph = StateGraph(AgentState)
 
     graph.add_node("preprocess", preprocess_node)
+    graph.add_node("guardrails", guardrails_node)
     graph.add_node("generate", generate_node)
     graph.add_node("postprocess", postprocess_node)
 
     graph.set_entry_point("preprocess")
-    graph.add_edge("preprocess", "generate")
+    graph.add_edge("preprocess", "guardrails")
+    
+    # Conditional edge from guardrails to check invalid queries. 
+    graph.add_conditional_edges(
+        "guardrails",
+        route_guardrails,
+    )
+    
     graph.add_edge("generate", "postprocess")
     graph.add_edge("postprocess", END)
 
     return graph.compile()
 
-
-# ── Public runner ──────────────────────────────────────────────────
 
 _compiled_graph = None
 

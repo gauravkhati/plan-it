@@ -41,7 +41,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ── Session store (initialised at startup) ─────────────────────────
+# ── Session store
 store: SessionStore | None = None
 user_store: UserStore | None = None
 security = HTTPBearer()
@@ -52,14 +52,13 @@ async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
     global store, user_store
     store = create_session_store()
-    # Create matching user store
     if isinstance(store, MongoSessionStore):
         user_store = MongoUserStore(store._db)
     else:
         user_store = UserStore()
     logger.info("Session store ready: %s", type(store).__name__)
     yield
-    # Cleanup
+    #cleanup
     if isinstance(store, MongoSessionStore):
         await store.close()
         logger.info("MongoDB connection closed.")
@@ -75,9 +74,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# ── Auth dependency ────────────────────────────────────────────────
-
+# auth endpoints
 async def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)) -> User:
     """Validate JWT and return User object."""
     payload = decode_token(creds.credentials)
@@ -89,7 +86,6 @@ async def get_current_user(creds: HTTPAuthorizationCredentials = Depends(securit
     return user
 
 
-# ── Auth endpoints ─────────────────────────────────────────────────
 
 
 @app.post("/auth/register", response_model=AuthResponse)
@@ -123,7 +119,6 @@ async def get_me(user: User = Depends(get_current_user)):
     return {"user_id": user.user_id, "email": user.email, "display_name": user.display_name}
 
 
-# ── Endpoints ──────────────────────────────────────────────────────
 
 
 @app.post("/session", response_model=dict)

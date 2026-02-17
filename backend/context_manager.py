@@ -129,6 +129,8 @@ def build_context_messages(session: Session) -> list[dict]:
 
     # Append remaining messages (newest portion kept after compression).
     for msg in session.messages:
+        if msg.is_blocked:
+            continue
         context_parts.append({"role": msg.role.value, "content": msg.content})
 
     return context_parts

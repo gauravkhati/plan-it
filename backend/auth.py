@@ -14,9 +14,7 @@ import jwt
 
 logger = logging.getLogger(__name__)
 
-# ── Password hashing ───────────────────────────────────────────────
-
-
+# ── Password hashing ─────
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8")[:72], bcrypt.gensalt()).decode("utf-8")
 
@@ -25,8 +23,7 @@ def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode("utf-8")[:72], hashed.encode("utf-8"))
 
 
-# ── JWT helpers ────────────────────────────────────────────────────
-
+# ── JWT helpers ─────
 SECRET_KEY = os.getenv("JWT_SECRET", "plan-it-dev-secret-change-me")
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = 72
@@ -49,8 +46,7 @@ def decode_token(token: str) -> dict | None:
         return None
 
 
-# ── User model ─────────────────────────────────────────────────────
-
+# ── User model ───────
 class User(BaseModel):
     user_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     email: str
@@ -59,14 +55,14 @@ class User(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-# ── User store abstraction ─────────────────────────────────────────
+# ── User store abstraction ────
 
 class UserStore:
     """Simple in-memory user store. Can be replaced with Mongo later."""
 
     def __init__(self) -> None:
-        self._users: dict[str, User] = {}        # user_id → User
-        self._emails: dict[str, str] = {}         # email  → user_id
+        self._users: dict[str, User] = {}      
+        self._emails: dict[str, str] = {}       
 
     async def get_by_id(self, user_id: str) -> Optional[User]:
         return self._users.get(user_id)
@@ -115,7 +111,7 @@ class MongoUserStore(UserStore):
         return count > 0
 
 
-# ── Request / Response schemas ─────────────────────────────────────
+# ── Request / Response schemas ──────
 
 class RegisterRequest(BaseModel):
     email: str

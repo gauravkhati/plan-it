@@ -88,6 +88,10 @@ export default function AuthScreen({ onAuth }) {
             />
           </div>
 
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px', fontStyle: 'italic', textAlign: 'center' }}>
+            Note: The server may take ~1 minute to wake up (cold start).
+          </div>
+
           {error && (
             <div className="auth-error">
               <AlertCircle size={14} /> {error}
