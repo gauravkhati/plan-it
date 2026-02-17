@@ -80,71 +80,77 @@ function PlanBlock({ plan, updatedStepIds }) {
   );
 }
 
-/* ── Version Popup ────────────────────────────────────────────────── */
-function VersionModal({ version, onClose }) {
-  if (!version) return null;
+/* ── Version history item with inline accordion ────────────────────── */
+function VersionItem({ version, isLatest }) {
+  const [expanded, setExpanded] = useState(false);
+  
   return (
-    <div className="pp-modal-backdrop" onClick={onClose}>
-      <div className="pp-modal" onClick={e => e.stopPropagation()}>
-        <div className="pp-modal-header">
-          <div className="pp-modal-title">
+    <div className="pp-timeline-item">
+      <div className="pp-timeline-marker">
+        <div className={`pp-timeline-dot ${isLatest ? 'latest' : ''}`}>
+          {isLatest ? <Sparkles size={12} /> : <History size={12} />}
+        </div>
+        <div className="pp-timeline-line" />
+      </div>
+      
+      <div className="pp-timeline-content">
+        <button 
+          className="pp-ver-header"
+          onClick={() => setExpanded(!expanded)}
+          type="button"
+        >
+          <div className="pp-ver-header-left">
             <span className="pp-ver-badge">v{version.version}</span>
-            {version.change_summary}
+            <span className="pp-ver-summary">{version.change_summary}</span>
           </div>
-          <button className="pp-modal-close" onClick={onClose}>
-            <XCircle size={18} />
-          </button>
-        </div>
-        <div className="pp-modal-body">
-          <PlanBlock plan={version.plan} />
-        </div>
+          <div className="pp-ver-header-right">
+            {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </div>
+        </button>
+        
+        {expanded && (
+          <div className="pp-ver-details">
+            <PlanBlock plan={version.plan} />
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-/* ── Version history (collapsed by default) ───────────────────────── */
+/* ── Version history (timeline style) ───────────────────────────────── */
 function Versions({ versions }) {
   const [show, setShow] = useState(false);
-  const [selected, setSelected] = useState(null);
   
   // If no versions, don't render anything
   if (!versions || versions.length === 0) return null;
 
   return (
-    <>
-      <div className="pp-section">
-        <button 
-          className="pp-section-toggle" 
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setShow(!show);
-          }}
-          type="button"
-        >
-          <History size={14} />
-          Version History ({versions.length})
-          {show ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-        </button>
+    <div className="pp-card">
+      <button 
+        className="pp-card-hdr pp-card-hdr-clickable" 
+        onClick={() => setShow(!show)}
+        type="button"
+      >
+        <History size={14} />
+        <span>Version History ({versions.length})</span>
+        <div style={{ marginLeft: 'auto' }}>
+          {show ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </div>
+      </button>
 
-        {show && (
-          <ul className="pp-versions">
-            {[...versions].reverse().map(v => (
-              <li key={v.version} className="pp-ver-item">
-                <button className="pp-ver-row" onClick={() => setSelected(v)}>
-                  <span className="pp-ver-badge">v{v.version}</span>
-                  <span className="pp-ver-text">{v.change_summary}</span>
-                  <ArrowRightCircle size={13} style={{ opacity: 0.5 }} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {selected && <VersionModal version={selected} onClose={() => setSelected(null)} />}
-    </>
+      {show && (
+        <div className="pp-timeline">
+          {[...versions].reverse().map((v, idx) => (
+            <VersionItem 
+              key={v.version} 
+              version={v} 
+              isLatest={idx === 0}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
