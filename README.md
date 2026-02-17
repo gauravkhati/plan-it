@@ -14,12 +14,13 @@ Building a reliable planning agent requires more than just prompting an LLM. Thi
 One of the biggest challenges with LLM agents is preventing them from finalizing decisions prematurely. To solve this, the agent in `backend/agent.py` implements specific `ActionType` states:
 *   **PROPOSE:** The agent gathers requirements and presents a draft plan. This is a read-only preview state.
 *   **CREATE:** This action is *only* triggered after the user explicitly confirms the proposed plan (e.g., "Yes, looks good").
+*   **UPDATE:** This action is triggered when user wants to edit current plan.
 *   This separation ensures the user is always in the loop before any persistent state change occurs, preventing the "runaway agent" problem.
 
 ### 2. Structured State Management (LangGraph)
 Instead of treating the conversation as a simple append-only list of strings, the system uses **LangGraph** to model the interaction as a state machine.
-*   The agent's output is not just text; it's a structured `AgentResponse` JSON object containing a `thought` trace (hidden from user), a `response_to_user`, and a strongly-typed `Plan` object.
-*   This allows the Frontend to render interactive UI components (like the Kanban implementation in `PlanPanel.jsx`) rather than just parsing markdown text.
+*   The agent's output is not just text; it's a structured `AgentResponse` JSON object containing a `thought` trace (hidden from user), a `response_to_user`, and a strongly-typed `Plan` object. 
+* To make the system stateful, the messages and the state is save in the database/in-memory store for persistence
 
 ### 3. Context Budgeting & Semantic Compression
 LLM context windows are finite and expensive. The `ContextManager` (`backend/context_manager.py`) actively manages the token budget:
@@ -31,6 +32,10 @@ LLM context windows are finite and expensive. The `ContextManager` (`backend/con
 To keep the agent focused, we separated the logic into two distinct layers:
 *   **Guardrail Layer:** A specific `GUARDRAIL_PROMPT` screens inputs *before* they reach the planning logic. This cheaply filters out irrelevant queries (e.g., "Write a poem about dogs") without wasting the main agent's reasoning capacity.
 *   **System Layer:** The core `SYSTEM_PROMPT` focuses purely on the mechanics of plan creation (ID generation, status tracking, summarization), keeping the main prompt cleaner and more effective.
+
+### 5. Authentication
+* To enable multiple chat sessions for a single user
+* Email and password based JWT authentication implementation.
 
 ---
 
@@ -89,7 +94,7 @@ To keep the agent focused, we separated the logic into two distinct layers:
 ### 3. Usage Guide
 
 1.  Open the web interface.
-2.  (Optional) Click "Login" -> "Continue as Guest" for a quick start.
+2.  SignUp or Login with email and password.
 3.  **Start Planning:** Type a goal like *"Plan a 3-day marketing sprint"*.
 4.  **Refine:** The agent will ask clarifying questions. Answer them to narrow down the scope.
 5.  **Confirm:** Once the agent proposes a plan, review it in the right-hand panel. Type *"Yes"* to finalize it.
@@ -103,7 +108,7 @@ To keep the agent focused, we separated the logic into two distinct layers:
 Currently, the agent is purely conversational and structural. The next phase involves equipping the agent with **executable tools** to perform real-world actions. This would allow the agent to not just *plan* a task, but *execute* parts of it (e.g., "Draft an email to the team" or "Search for optimization libraries").
 
 ### 2. Model Context Protocol (MCP) Integration
-To extend the agent's capabilities without bloating the core codebase, we plan to integrate **MCP (Model Context Protocol)** servers. This effectively gives the agent a plugin system to interact with external services:
+To extend the agent's capabilities without bloating the core codebase, I plan to integrate **MCP (Model Context Protocol)** servers. This effectively gives the agent a plugin system to interact with external services:
 *   **Calendar Integration:** Automatically block time for planned tasks (Google Calendar/Outlook).
 *   **Travel & Logistics:** Check flight availability and book tickets for travel-related plans.
 *   **Knowledge Retrieval:** Fetch documentation or internal wiki pages to support technical planning tasks.
